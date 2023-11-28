@@ -2,6 +2,7 @@
 ## Chapter7 Mutual Exclusion
 ### 1.Introduction
 排他制御は並列プログラミングにおいて根本的な問題であり、様々なコンテキストで研究されてきた。
+大きく分けて共有メモリに着目したものとmessage passingの2つである。
 <br>
 <br>
 <br>
@@ -13,47 +14,58 @@
 - 各プロセスはCritical Section (CS) に定期的に進入し、CSを実行し、CSを出て他の作業を行う
 
 問題定義 - 以下の3つの条件を満たすようなプロトコルを考えたい
-- ME1: [Mutual exclusion] 任意の時刻で、最大一つのプロセスがCS内にに存在し得る (safety)
-- ME2: [Freedom from deadlock] **あらゆる構成において**、最低でも一つのプロセスがactionを起こして、CS内に進入可能である。(safety)
-- ME3: [Progress] CSに侵入しようとしているすべてのプロセスが最終的にはそれに成功する (liveliness)
+- ME1: [Mutual exclusion] 任意のタイミングで、最大一つのプロセスがCS内に存在し得る (safety)
+- ME2: [Freedom from deadlock] あらゆる場面において(In every configuration)、最低でも一つのプロセスが動作してCS内に進入可能である。(safety)
+- ME3: [Progress] CSに進入しようとしているすべてのプロセスが最終的にはそれに成功する (liveliness)
 
 #### 2.1 Lamportの解法
+一言で言うと「全員にリクエスト(タイムスタンプ付き)を送って、全員からackが返ってきてかつ自分のタイムスタンプが最小なら実行できる」
 
 - 全結合グラフで動作
 - 通信チャネルはFIFO
 - 各プロセスはrequest-queue Qを保持
-
 以下の5つのルールによって説明される
 - LA1: CSへの侵入のリクエストをする際には、プロセスはタイムスタンプが付与されたリクエストを他のすべてのプロセスに送信し、自分のQにもそのリクエストを加える。
-- LA2: プロセスがリクエストを受信した際には、それをQに加える。自身がCSにいない場合にはタイムスタンプが付与されたackを送信者に返し、CSにいる場合にはCSから退出する。
-- LA3: プロセスは(1)自分の持つQのにおいて自身のリクエストのタイムスタンプが他のすべてのリクエストのものよりも小さく、かつ(2)そのリクエストに対してのackを他のすべてのプロセスから受け取った際にCSに進入する。
+- LA2: プロセスがリクエストを受信した際には、それをQに加える。自身がCSにいない場合にはタイムスタンプが付与されたackを送信者に返し、CSにいる場合にはCSから退出してからそれを行う。
+- LA3: プロセスは(1)自分の持つQにおいて自身のリクエストのタイムスタンプが他のすべてのリクエストのものよりも小さく、かつ(2)そのリクエストに対してのackを他のすべてのプロセスから受け取った際にCSに進入する。
 - LA4: CSから退出するときには、(1)当該リクエストを自身のQから削除し、また(2)タイムスタンプが付与されたreleaseメッセージを他のすべてのプロセスに送信する。
 - LA5: プロセスがreleaseメッセージを受け取った際には、対応するリクエストを自身のQから削除する。
 
 Message Complexity - CSに進入して退出するのに必要なメッセージの数
 各プロセスは(n-1)メッセージをリクエストに、(n-1)メッセージをackとして受け取り、さらに(n-1)メッセージをrelease messageとして退出時に送信するので3(n-1)。
+
+ちなみに、同時にリクエストしたときに、遅いほうjが出したリクエストへの速い方iからのackが、iからのリクエストよりも早くjに届く可能性があるので通信チャネルはFIFOじゃないとだめ。
 <br>
 <br>
 
 #### 2.2 Ricart-Agrawalaの解法
-Lamportの解法を改善。各プロセスは個別にqueueを持つのではなく、受け取ったackの数を数える。(通信チャネルはFIFOでなくてもよい)
+Lamportの解法を改善。(通信チャネルはFIFOでなくてもよい)<br>
+一言で言うと「全員にリクエスト(タイムスタンプ付き)を送って、全員からackが返ってきたら実行できる」
+
 - RA1:CSに進入しようとしている各プロセスはタイムスタンプが付与されたリクエストを他の全てのプロセスに送信する。
 - RA2: リクエストを受信したプロセスは以下のどちらかを満たすときのみackを返す。(1)自身がCSに進入しようとしていない。(2)CSに進入しようとしているが、そのタイムスタンプが受信したリクエストに付与されているタイムスタンプよりも大きい。受信したプロセスがすでにCSに進入している場合、もしくは自身のタイムスタンプのほうが小さい場合には、自身がCSを退出するまでリクエストを**バッファする**
 - RA3: プロセスは送信したリクエストに対してのackを他のすべてのプロセスから受け取った際にCSに進入する。
-- RA4: CSか<br>
-<br>ら退出する際には、新たなリクエストを作ったり、他の作業を行ったりする前に、バッファしていたリクエスト全てに対してackを送信する必要がある。
+- RA4: CSから退出する際には、新たなリクエストを作ったり、他の作業を行ったりする前に、バッファしていたリクエスト全てに対してackを送信する必要がある。
 
 Message Complexity
 各プロセスは(n-1)メッセージをリクエストに、(n-1)メッセージをackとして受け取るので2(n-1)。
+
+ME1の証明:<br>
+2つのプロセスi,jがCSに同時に進入することができるのはそれらがともに(n-1)個のackを受信した場合だが、RA2によりi,jが互いにackを送り合うことはできないのでこれはありえない。<br>
+<br>
+ME2とME3の証明：<br>
+プロセスをノードとする有向グラフを考える。jがすでにCS内にいる、もしくはjのリクエストのタイムスタンプがiのよりも小さい場合に、iからjへの有向辺を加える。このとき、Gは自明にacyclic。<br>
+CSに進入しようとするプロセスiは、少なくとも一つi->jの辺があるプロセスjが存在するときに待ち続け、jはCSを完了するまでiにackを送らない。RA3より、out-degreeが0となるノードのプロセスはすべてのackを受け取り、CSに進入する。CSから退出する際には、ackを送信し、すなわちすべての待っているノードのout-degreeがデクリメントされる(RA4)。<br>
+よって、out-degreeの少ない順にCSに進入する。Gがacyclicであるためにデッドロックは起きず、またすべての待っているプロセスは有限回でCSに進入する。
 <br>
 <br>
 
 #### 2.3 Maekawaの解法
 同じpermission basedのアルゴリズムでも、LamportやRicart-Agrawalaの解法ではすべてのプロセスから許可を必要としていたが、実際は全てから許可をもらう必要はないのでは？というのがベースのアイデア。
-各プロセスは個々に定義されるsubset S_iからの許可を取得することで、CSへの進入を許可される$
-S_iは以下を満たす
+各プロセスは個々に定義されるsubset $S_i$からの許可を取得することで、CSへの進入を許可される<br>
+$S_i$は以下を満たす
 - $\forall i,j \leq i \leq n-1:: S_i \cap S_j \neq \varnothing$
-- プロセスiとjがともにCSに入りたいときには、S<sub>i</sub> $\cap$ S<sub>j</sub>が調停者としてどちらか一方だけを選んでackを送り、もう一方を延期させる
+- プロセスiとjがともにCSに入りたいときには、 $S_i \cap S_j$ が調停者としてどちらか一方だけを選んでackを送り、もう一方を延期させる
 - $i \in S_i$. 自分自身からは当然CSに侵入するにあたってackを受け取ることとする。メッセージコストはかからない
 - 各プロセスは同じ数だけの部分集合に含まれる。各プロセスが同じプロセス数分の調停者となっていることはシステムの対称性を形成する。
 
@@ -78,8 +90,8 @@ S_iは以下を満たす
 これがME2やME3を満たすようになるのだが、実世界では実現が難しい。
 
 ##### Maekawa2
-request, ack, release, failed, inquire, relinquishというsignalを用いて実現。
-TODO
+request, ack, release, failed, inquire, relinquishというsignalを用いて実現。<br>
+//TODO
 <br>
 <br>
 <br>
@@ -94,6 +106,9 @@ TODO
 - トークンが持つデータ構造は以下の2つ。
   - (1)プロセスjによって直近で実行された際のsequence numberをlast[j]が表す、整数配列last[0.. n-1]
   - (2)トークンを待っているプロセスidをためておくためのqueue Q
+     
+[図解pg4](https://docs.google.com/presentation/d/19KHvjLuHe5_7m8bEg8hPUKBa8Wne0vkR_EqGoyr8v4I/edit?usp=sharing)
+
 
 アルゴリズム
 - 進入時
@@ -119,6 +134,8 @@ Message Complexity
 - 各プロセスはholder変数をもつ
   - i -> jの有向辺がある場合、jはiのholderである
 
+[図解pg13](https://docs.google.com/presentation/d/19KHvjLuHe5_7m8bEg8hPUKBa8Wne0vkR_EqGoyr8v4I/edit?usp=sharing)
+
 アルゴリズム
 - 進入時
   - プロセスiがトークンを持っておらず、かつ**Qが空**であり、CSに進入したい際にはリクエストをholderのプロセスに送る。リクエストを送ったらそのリクエストを自身のQに追加する。
@@ -131,6 +148,7 @@ Message Complexity
 - 退出時
   - Qが空でなければ、Qから先頭を削除してそのエントリに示されているプロセスにトークンを送り、holderをそのプロセスに更新する
   - 上記を行った上でまだQが空でなければ、リクエストをholderに送ることでトークンを送り返してもらうようにする
+ (結局holderを更新する作業は(有向辺を逆さにする操作)atomicにしないとバグるはず？)
 
 Message Complexity
 木の中の任意の2つのノードの平均距離はO(logn)なのでo(logn)
@@ -138,9 +156,10 @@ Message Complexity
 <br>
 <br>
 
+
 ### 4 Solutions on the Shared Memory Model
-共有メモリに対するatomic read and write operationsが前提
-**The requirements of a correct solution on the shared-memory model are similar to those in the message passing model, except that fairness is specified as freedom rom livelock or freedom from starvation: no process can be indefinitely prevented from entering its CS by other processes in the system.**
+共有メモリに対するatomic read and write operationsが前提 <br>
+**The requirements of a correct solution on the shared-memory model are similar to those in the message passing model, except that fairness is specified as freedom from livelock or freedom from starvation: no process can be indefinitely prevented from entering its CS by other processes in the system.**
 
 #### 4.1 Peterson's Algorithm
 2プロセスにおける解法
@@ -204,6 +223,28 @@ do{
     critical section;
 
   flag[1] = false;
+    
+  } while(true);
+
+```
+ちなみに、nプロセスへの拡張は以下の通り
+```C
+define flag,turn: array[0..n-1] of shared Boolean;
+initially \forall k:flag[k] = 0, and turn = 0
+
+process i
+do{
+  j = 1;
+  do{
+    flag[i] = j;
+    turn[j] = i;
+    while(\exist \neq i:flag[k] /geq j \land turn[j] = i);
+    j = j + 1;
+  }while(j != n-1)
+
+    critical section;
+
+    flag[i] = false;
     
   } while(true);
 
