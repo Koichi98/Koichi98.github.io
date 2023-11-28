@@ -2,6 +2,9 @@
 ## Chapter7 Mutual Exclusion
 ### 1.Introduction
 排他制御は並列プログラミングにおいて根本的な問題であり、様々なコンテキストで研究されてきた。
+<br>
+<br>
+<br>
 
 ### 2.Message-Passing Systemsに対する解法
 前提条件
@@ -29,18 +32,57 @@
 
 Message Complexity - CSに進入して退出するのに必要なメッセージの数
 各プロセスは(n-1)メッセージをリクエストに、(n-1)メッセージをackとして受け取り、さらに(n-1)メッセージをrelease messageとして退出時に送信するので3(n-1)。
+<br>
+<br>
 
 #### 2.2 Ricart-Agrawalaの解法
 Lamportの解法を改善。各プロセスは個別にqueueを持つのではなく、受け取ったackの数を数える。(通信チャネルはFIFOでなくてもよい)
 - RA1:CSに進入しようとしている各プロセスはタイムスタンプが付与されたリクエストを他の全てのプロセスに送信する。
 - RA2: リクエストを受信したプロセスは以下のどちらかを満たすときのみackを返す。(1)自身がCSに進入しようとしていない。(2)CSに進入しようとしているが、そのタイムスタンプが受信したリクエストに付与されているタイムスタンプよりも大きい。受信したプロセスがすでにCSに進入している場合、もしくは自身のタイムスタンプのほうが小さい場合には、自身がCSを退出するまでリクエストを**バッファする**
 - RA3: プロセスは送信したリクエストに対してのackを他のすべてのプロセスから受け取った際にCSに進入する。
-- RA4: CSから退出する際には、新たなリクエストを作ったり、他の作業を行ったりする前に、バッファしていたリクエスト全てに対してackを送信する必要がある。
+- RA4: CSか<br>
+<br>ら退出する際には、新たなリクエストを作ったり、他の作業を行ったりする前に、バッファしていたリクエスト全てに対してackを送信する必要がある。
 
 Message Complexity
 各プロセスは(n-1)メッセージをリクエストに、(n-1)メッセージをackとして受け取るので2(n-1)。
+<br>
+<br>
 
 #### 2.3 Maekawaの解法
+同じpermission basedのアルゴリズムでも、LamportやRicart-Agrawalaの解法ではすべてのプロセスから許可を必要としていたが、実際は全てから許可をもらう必要はないのでは？というのがベースのアイデア。
+各プロセスは個々に定義されるsubset S_iからの許可を取得することで、CSへの進入を許可される$
+S_iは以下を満たす
+- $\forall i,j \leq i \leq n-1:: S_i \cap S_j \neq \varnothing$
+- プロセスiとjがともにCSに入りたいときには、S<sub>i</sub> $\cap$ S<sub>j</sub>が調停者としてどちらか一方だけを選んでackを送り、もう一方を延期させる
+- $i \in S_i$. 自分自身からは当然CSに侵入するにあたってackを受け取ることとする。メッセージコストはかからない
+- 各プロセスは同じ数だけの部分集合に含まれる。各プロセスが同じプロセス数分の調停者となっていることはシステムの対称性を形成する。
+
+以下の5つのルールによって説明される
+- MA1: CSに侵入する際に、プロセスiはタイムスタンプが付与されたリクエストを $S_i$ のすべてのプロセスに送る
+- MA2: 自身がCSに入っておらず、リクエスト受け取ったプロセスはタイムスタンプの値が最も小さいものにackを送る。その上で、自分自身をそのプロセスに対してlockし、他のすべてのリクエストをqueueに入れる。もし、CSに入っていた場合にはこの操作を自身がCSを出るまで延期する。
+- MA3: プロセスiはすべての $S_i$ からのackを受け取るとCSに入る
+- MA4: CSを退出する際にはプロセスiはreleaseメッセージを $S_i$ のすべてのプロセスに送る
+- MA5: releaseメッセージをプロセスiから受け取るとプロセスはlockを解除し、そのリクエストの削除を行った上で、また最小のタイムスタンプの値のものにackを送る。
+
+しかし、このアルゴリズムはデッドロックする可能性がある。例えば以下のような場合。
+- $S_0 = {0,1,2}$のうち、プロセス0と2がackを0に送るが、プロセス1は1に送る
+- $S_1 = {1,3,5}$のうち、プロセス1と3がackを1に送るが、プロセス5は2に送る
+- $S_2 = {2,4,5}$のうち、プロセス4と5がackを2に送るが、プロセス2は0に送る
+このとき、0は1を、1は2を、2は0を待つことになり、デッドロック。
+
+この問題の本質はプロセスがリクエストを受け取ったときに、他によりタイムスタンプが小さいものがこの後来るかが分からないという点にある。
+それゆえ、実際に $S_i$ で発生しているリクエストに対して、本当にタイムスタンプが小さいものに対してackをするとは限らず、デッドロックが起きてしまう。
+2つの回避策がある。
+##### Global FIFO
+各プロセスが受け取るリクエストは必ずタイムスタンプ順であるという仮定をおく。(通信チャネルがFIFOになっている)。
+これがME2やME3を満たすようになるのだが、実世界では実現が難しい。
+
+##### Maekawa2
+request, ack, release, failed, inquire, relinquishというsignalを用いて実現。
+TODO
+<br>
+<br>
+<br>
 
 ### 3 Token-Passing Algorithms
 トークンと呼ばれるものをCSへの進入の許可証として利用し、プロセス間で渡し合うことという方法。
@@ -55,8 +97,129 @@ Message Complexity
 
 アルゴリズム
 - 進入時
-  -  プロセスiがCSに進入したいがトークンを持たない際に、プロセスiは自身のreq_i[i]のsequence numberをインクリメントし、トークンを要求するためにリクエストメッセージ(i,sn)を他のすべてのプロセスに送信する。
-  -  
+  - プロセスiがCSに進入したいがトークンを持たない際に、プロセスiは自身のreq_i[i]のsequence numberをインクリメントし、トークンを要求するためにリクエスト(i,sn)を他のすべてのプロセスに送信する。
+  - プロセスjがリクエスト(i,sn)をプロセスiから受け取ると、req_j[i]=max(req_j[i],sn)を行ってreq_j[i]を更新する。
+- CS実行時
+  - プロセスiはトークンを取得したらCSを実行
+- 退出時
+  - last[i] = req_i[i]を行ってreq_i[i]が実行されたことを示す
+  - 各プロセスj(0..i-1,i+1..n-1)に対して、もしQにjが入っておらず、かつreq_i[j]=last[j]+1であれば、jをQに追加してプロセスjがリクエストしていることを反映させる
+  - 上記の更新を行った上で、Qが空でなければQからidを一つ取り出してそのプロセスにトークンを送る
+  - Qが空の場合にはそのままトークンを保持する
+
+Message Complexity
+各プロセスは(n-1)メッセージをリクエストに、1メッセージをtokenとして受け取るのでn。
+<br>
+<br>
+
+#### 3.2 Raymond's Algorithm
+- トークンを持つプロセスをrootとし、辺がrootの方向を指すような有向木としてプロセス群を構成する
+- 各プロセスはqueue Qを持つ
+  - このqueueは隣接するノード(プロセス)からきたリクエストでまだトークンを送られていないプロセスのものを保持する
+- 各プロセスはholder変数をもつ
+  - i -> jの有向辺がある場合、jはiのholderである
+
+アルゴリズム
+- 進入時
+  - プロセスiがトークンを持っておらず、かつ**Qが空**であり、CSに進入したい際にはリクエストをholderのプロセスに送る。リクエストを送ったらそのリクエストを自身のQに追加する。
+  - rootへのパス上のプロセスjがプロセスiのリクエストを受け取ると、そのリクエストを自身のQに追加する。また、以前に受け取った任意のリクエストをholderに送っていなければ、自身のholderに送る
+  - rootプロセスrがリクエストを受け取ると、リクエスト元のプロセスにトークンを送り、holderをそのプロセスにセットする
+  - トークンを受け取ると、プロセスjはQの先頭を削除し、そのエントリに示されているプロセスにトークンを送る。また、holderをその送り先に更新する。
+  - Qを削除した後もまだQがからでなければリクエストをholderに向かって送ることでトークンを送り返してもらうようにする
+- CS実行時
+  - プロセスはトークンを受け取り、自分のリクエストが自身のQの先頭にある場合にはCSを実行する
+- 退出時
+  - Qが空でなければ、Qから先頭を削除してそのエントリに示されているプロセスにトークンを送り、holderをそのプロセスに更新する
+  - 上記を行った上でまだQが空でなければ、リクエストをholderに送ることでトークンを送り返してもらうようにする
+
+Message Complexity
+木の中の任意の2つのノードの平均距離はO(logn)なのでo(logn)
+<br>
+<br>
+<br>
+
+### 4 Solutions on the Shared Memory Model
+共有メモリに対するatomic read and write operationsが前提
+**The requirements of a correct solution on the shared-memory model are similar to those in the message passing model, except that fairness is specified as freedom rom livelock or freedom from starvation: no process can be indefinitely prevented from entering its CS by other processes in the system.**
+
+#### 4.1 Peterson's Algorithm
+2プロセスにおける解法
+- プロセス0とプロセス1
+- 各プロセスiにはBooleanのflag[i]があり、これはどのプロセスからもread可能だがwriteはiにのみ可能
+
+```C 
+define flag[0],flag[1]: shared Boolean;
+initially both are false;
+
+# process0 
+do{
+  flag[0] = true;
+  while (flag[1]);
+
+    critical section;
+
+  flag[0] = false;
+    
+  } while(true);
 
 
-  
+# process1
+do{
+  flag[1] = true;
+  while (flag[0]);
+
+    critical section;
+
+  flag[1] = false;
+    
+  } while(true);
+
+```
+上の解法はsafetyを保証するが、deadlock-freeではない。2つのプロセスのflagが同時にtrueになってしまうとお互いがお互いを待つことになる。
+そこで整数型のintを共有変数として導入することでこれを解決する。turnを更新したプロセス自身はCSへの進入を待つという原理。
+```C 
+define flag[0],flag[1]: shared Boolean;
+turn: shared integer
+initially flag[0],flag[1] are false; turn = 0 or 1
+
+# process0 
+do{
+  flag[0] = true;
+  turn = 0
+  while (flag[1] && turn == 0);
+
+    critical section;
+
+  flag[0] = false;
+    
+  } while(true);
+
+
+# process1
+do{
+  flag[1] = true;
+  turn = 1
+  while (flag[0] && turn == 1);
+
+    critical section;
+
+  flag[1] = false;
+    
+  } while(true);
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
