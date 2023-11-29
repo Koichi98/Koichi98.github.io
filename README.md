@@ -159,7 +159,6 @@ Message Complexity<br>
 
 ### 4 Solutions on the Shared Memory Model
 共有メモリに対するatomic read and write operationsが前提 <br>
-**The requirements of a correct solution on the shared-memory model are similar to those in the message passing model, except that fairness is specified as freedom from livelock or freedom from starvation: no process can be indefinitely prevented from entering its CS by other processes in the system.**
 
 #### 4.1 Peterson's Algorithm
 2プロセスにおける解法
